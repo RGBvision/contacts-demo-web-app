@@ -1,0 +1,1 @@
+CREATE TABLE `contacts` (`phone` VARCHAR(12) NOT NULL COLLATE 'utf8mb4_unicode_ci', `first_name` VARCHAR(50) NOT NULL COLLATE 'utf8mb4_unicode_ci', `dob` DATE NOT NULL, UNIQUE INDEX `phone` (`phone`) USING BTREE) COLLATE='utf8mb4_unicode_ci' ENGINE=InnoDB;

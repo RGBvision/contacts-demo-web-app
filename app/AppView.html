@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Контакты</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#2b5797">
+    <meta name="theme-color" content="#ffffff">
+    <link href="/assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/plugins/datatables/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="/assets/plugins/fontawesome/css/all.min.css" rel="stylesheet">
+    <link href="/assets/plugins/datepicker/datepicker.min.css" rel="stylesheet">
+    <link href="/assets/plugins/sweetalert2/sweetalert2.min.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
+</head>
+<body>
+<main class="container py-5">
+    <div class="card shadow mb-5">
+        <div class="card-body">
+            <h5 class="card-title">Добавить контакт</h5>
+            <h6 class="card-subtitle mb-2 text-muted small">Все поля обязательны для заполнения</h6>
+            <form id="addContactForm" class="row g-3">
+                <div class="col-md-4">
+                    <label for="contactName" class="form-label">Имя</label>
+                    <input type="text" class="form-control" id="contactName" name="name" value="" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="contactPhone" class="form-label">Мобильный телефон</label>
+                    <input type="tel" class="form-control" id="contactPhone" name="phone" value="" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="contactDOB" class="form-label">Дата рождения</label>
+                    <input type="text" class="form-control" id="contactDOB" name="date" value="" required>
+                </div>
+                <div class="col-12 text-center text-md-end">
+                    <button class="btn btn-primary px-5" type="submit">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card shadow">
+        <div class="card-body">
+            <div class="row justify-content-between mb-2">
+                <div class="col align-self-center">
+                    <h5 class="card-title mb-0">Список контактов</h5>
+                </div>
+                <div class="col-auto">
+                    <button type="button" id="refreshList" class="btn btn-sm btn-primary"><i class="fas fa-sync"></i></button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="contactList" class="table table-striped">
+                    <thead>
+                    <tr>
+                        <th>имя</th>
+                        <th>мобильный телефон</th>
+                        <th>дата рождения</th>
+                        <th class="text-center" data-orderable="false"><i class="fa fa-ellipsis-h"></i></th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+<script src="/assets/plugins/jquery/jquery-3.6.0.min.js"></script>
+<script src="/assets/plugins/jquery-validation/jquery.validate.min.js"></script>
+<script src="/assets/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/plugins/datatables/jquery.dataTables.min.js"></script>
+<script src="/assets/plugins/datatables/dataTables.bootstrap5.min.js"></script>
+<script src="/assets/plugins/moment/moment-with-locales.min.js"></script>
+<script src="/assets/plugins/datepicker/datepicker.min.js"></script>
+<script src="/assets/plugins/sweetalert2/sweetalert2.all.min.js"></script>
+<script>
+    let contactListTable;
+
+    const Application = {
+
+        initialize: function () {
+            this.build();
+            this.events();
+        },
+
+        build: function () {
+            this.addValidateMethods();
+            this.setDatePicker();
+            this.setDataTable();
+            this.setAutoRefresh();
+        },
+
+        events: function () {
+            this.onFormSubmit();
+            this.onDeleteContact();
+            this.onRefreshList();
+        },
+
+        addValidateMethods() {
+
+            const defaultMessage = "Проверьте введенные данные";
+
+            // Реализация метода валидации REGEX
+            $.validator.addMethod(
+                "regex",
+                (value, element, regexp) => {
+                    const re = new RegExp(regexp);
+                    return re.test(value);
+                },
+                defaultMessage
+            );
+
+            // Реализация метода валидации даты в формате DD-MM-YYYY и >= 01-01-1940
+            $.validator.addMethod(
+                "validDate",
+                (value) => {
+                    return moment(value, "DD-MM-YYYY").isValid() && moment(value, "DD-MM-YYYY").isSameOrAfter('1940-01-01');
+                },
+                defaultMessage
+            );
+
+        },
+
+        // Show form validation messages as tooltip
+        customValidatorMessage(errorMap, errorList) {
+            // Удаляем все tooltip для валидных элементов
+            $.each(this.validElements(), (index, element) => {
+                var $element = $(element);
+                $element.attr("title", "") // Очищаем "title", т.к. ошибок нет
+                    .removeClass("is-invalid")
+                    .addClass("is-valid")
+                    .tooltip("dispose");
+            });
+            // Create new tooltips for invalid elements
+            $.each(errorList, (index, error) => {
+                var $element = $(error.element);
+                $element.tooltip("dispose") // Удаляем tooltip, если он есть на элементе
+                    .attr("title", error.message)
+                    .addClass("is-invalid")
+                    .removeClass("is-valid")
+                    .tooltip(); // Генерируем новый tooltip с соощением об ошибке, которое предварительно воткнуто в title
+            });
+        },
+
+        onFormSubmit() {
+
+            let addContactForm = $('form#addContactForm');
+
+            addContactForm.validate({
+                rules: {
+                    name: {
+                        required: true,
+                        regex: /^[а-яё]{3,}$/ui
+                    },
+                    phone: {
+                        required: true,
+                        normalizer: function (value) {
+                            const normalized = '+7' + value.replace(/\D+/g, '').replace(/^[78]/g, '');
+                            $('#contactPhone').val(normalized);
+                            return normalized;
+                        },
+                        regex: /^\+79\d{9}$/
+                    },
+                    date: {
+                        required: true,
+                        validDate: true
+                    }
+                },
+                messages: {
+                    name: {
+                        required: 'Введите имя контакта',
+                        regex: 'Это поле должно содержать только имя: кириллические символы и не менее 3-х символов / Да, мы знаем про имя Ян, но увы =)'
+                    },
+                    phone: {
+                        required: 'Введите номер мобильного телефона',
+                        regex: 'Введите телефон в формате +79990000000'
+                    },
+                    date: {
+                        required: 'Введите дату рождения',
+                        validDate: 'Введите дату в формате ДД-ММ-ГГГГ и не ранее 01-01-1940'
+                    }
+                },
+                showErrors: this.customValidatorMessage,
+                errorClass: "is-invalid",
+                validClass: "is-valid",
+                submitHandler: (form) => {
+                    $.ajax({
+                        type: "PUT",
+                        url: '/contact/add',
+                        data: addContactForm.serialize(),
+                        success: (data) => {
+                            if (data.responseJSON?.error) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Ошибка...',
+                                    text: data.responseJSON?.content || 'Произошла ошибка. Попробуйте повторить позже.'
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'success',
+                                    text: data.responseJSON?.content || 'Контакт успешно добавлен'
+                                });
+                                form.reset();
+                                $(form).find('input').each((i, e) => $(e).removeClass('is-valid is-invalid'));
+                                contactListTable.ajax.reload();
+                            }
+                        },
+                        error: (data) => {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Ошибка...',
+                                text: data.responseJSON?.content || 'Произошла ошибка. Попробуйте повторить позже.'
+                            });
+                        },
+                        dataType: 'json'
+                    });
+                }
+            });
+
+        },
+
+        setDatePicker: function () {
+
+            Datepicker.locales.ru = {
+                days: ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"],
+                daysShort: ["Вск", "Пнд", "Втр", "Срд", "Чтв", "Птн", "Суб"],
+                daysMin: ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"],
+                months: ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
+                monthsShort: ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"],
+                today: "Сегодня",
+                clear: "Очистить",
+                format: "dd-mm-yyyy",
+                weekStart: 1,
+                monthsTitle: 'Месяцы'
+            };
+
+            const elem = document.querySelector('#contactDOB');
+            new Datepicker(elem, {
+                language: 'ru',
+                minDate: '01-01-1940',
+                maxDate: moment().format('DD-MM-YYYY')
+            });
+        },
+
+        setDataTable: function () {
+
+            $.fn.dataTable.ext.errMode = 'throw';
+
+            contactListTable = $('#contactList').DataTable({
+                dom: "rt",
+                processing: false,
+                serverSide: true,
+                language: {
+                    "decimal": "",
+                    "emptyTable": "В таблице нет данных",
+                    "info": "Показано от _START_ до _END_ из _TOTAL_ записей",
+                    "infoEmpty": "Показано от 0 до 0 из 0 записей",
+                    "infoFiltered": "(отфильтровано из _MAX_ записей)",
+                    "infoPostFix": "",
+                    "thousands": "'",
+                    "lengthMenu": "_MENU_ записей на страницу",
+                    "loadingRecords": "",
+                    "processing": "",
+                    "search": "Фильтр",
+                    "zeroRecords": "Записей не найдено",
+                    "paginate": {
+                        "first": "Первая",
+                        "last": "Последняя",
+                        "next": "Следующая",
+                        "previous": "Предыдущая"
+                    },
+                    "aria": {
+                        "sortAscending": ": сортировать по возрастанию",
+                        "sortDescending": ": сортировать по убыванию"
+                    }
+                },
+                ajax: {
+                    url: "/contacts/get",
+                    type: "GET",
+                    dataSrc: (json) => json.content.data
+                },
+                columnDefs: [
+                    {
+                        "render": function (data, type, row) {
+                            return '<a href="tel:' + data + '">' + data + '</a>';
+                        },
+                        "targets": 1
+                    },
+                    {
+                        "render": function (data, type, row) {
+                            return moment(data).lang("ru").format('LL');
+                        },
+                        "targets": 2
+                    },
+                    {
+                        "render": function (data, type, row) {
+                            return '<span class="text-center d-block"><button data-name="' + row[0] + '" data-phone="' + row[1] + '" class="DeleteContact btn btn-sm btn-danger text-nowrap"><i class="fa fa-trash"></i></button></span>';
+                        },
+                        "targets": 3
+                    }
+                ]
+            });
+        },
+
+        onDeleteContact: function () {
+            $(document).on('click', '.DeleteContact', function () {
+
+                const contact_name = $(this).data('name'),
+                    contact_phone = $(this).data('phone');
+
+                Swal.fire({
+                    title: `Удалить контакт «${contact_name}»?`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Да, удалить!',
+                    cancelButtonText: 'Нет'
+                }).then((result) => {
+                    if (result.value) {
+                        $.ajax({
+                            type: "DELETE",
+                            url: '/contact/delete',
+                            data: {phone: contact_phone},
+                            success: (data) => {
+                                if (data.responseJSON?.error) {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Ошибка...',
+                                        text: data.responseJSON?.content || 'Произошла ошибка. Попробуйте повторить позже.'
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'success',
+                                        text: data.responseJSON?.content || 'Контакт успешно удален'
+                                    });
+                                    contactListTable.ajax.reload();
+                                }
+                            },
+                            error: (data) => {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Ошибка...',
+                                    text: data.responseJSON?.content || 'Произошла ошибка. Попробуйте повторить позже.'
+                                });
+                            },
+                            dataType: 'json'
+                        });
+                    }
+                });
+            });
+        },
+
+        onRefreshList: function () {
+            $('#refreshList').click(() => {
+                contactListTable.ajax.reload()
+            });
+        },
+
+        // Автообновление списка контактов реализовано через интервал только для демонстрации.
+        // На продакшене лучше использовать sockets или push, чтоб не генерить DDoS в случае большого количества пользователей.
+        setAutoRefresh: function () {
+            setInterval(() => contactListTable.ajax.reload(), 5000);
+        }
+
+    };
+
+    $(document).ready(() => {
+        Application.initialize();
+    });
+</script>
+</body>
+</html>

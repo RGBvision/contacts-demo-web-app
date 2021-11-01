@@ -1,0 +1,1 @@
+CREATE TABLE contacts (phone VARCHAR(12) NOT NULL, first_name VARCHAR(50) NOT NULL, dob DATE NOT NULL, CONSTRAINT phone UNIQUE (phone));

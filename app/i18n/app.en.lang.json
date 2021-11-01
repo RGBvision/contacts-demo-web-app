@@ -1,0 +1,14 @@
+{
+  "app": {
+    "success": {
+      "contact_added": "Contact successfully added.",
+      "contact_deleted": "Contact successfully deleted."
+    },
+    "error": {
+      "model": "Model not found.",
+      "add_contact": "An error occurred while adding a contact.",
+      "delete_contact": "An error occurred while deleting a contact.",
+      "wrong_data": "Wrong data."
+    }
+  }
+}
